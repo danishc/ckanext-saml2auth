@@ -1,0 +1,6 @@
+dependencies:
+- name: keycloak
+  repository: https://codecentric.github.io/helm-charts
+  version: 18.1.1
+digest: sha256:907946fc1cd82da90f5a5610e1e12e694f1d350d38b6070bce0f9a06da20bc42
+generated: "2022-05-04T18:22:55.572757503+02:00"

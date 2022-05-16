@@ -1,0 +1,45 @@
+# Default values for helm-db.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+#PVCposgresql: &PVCposgresql ckan-postgres-persistent-volume-claim the name of the claim
+PVCposgresql: &PVCposgresql psql
+# MasterDBPass -- Variable for password for the master/main database user in PostgreSQL
+MasterDBUserPass: &MasterDBUserPass password
+# DBDeploymentName -- Variable for name override for postgres deployment
+DBDeploymentName: &DBDeploymentName postgres
+
+postgresql:
+  # postgresql.enabled -- Flag to control whether to deploy PostgreSQL
+  enabled: true
+  primary:
+    persistence:
+      # postgresql.persistence.existingClaim -- provide name to existing claim
+      existingClaim: *PVCposgresql
+#    resources:
+#      limits:
+#        cpu: 1000m
+#        memory: 2000Mi
+#      requests:
+#        cpu: 800m
+#        memory: 1500Mi
+    affinity: {}
+#    affinity:
+#      nodeAffinity:
+#        requiredDuringSchedulingIgnoredDuringExecution:
+#          nodeSelectorTerms:
+#          - matchExpressions:
+#            - key: purpose
+#              operator: In
+#              values:
+#                - sweb
+  volumePermissions:
+    enabled: true
+  # postgresql.fullnameOverride -- Name override for the PostgreSQL deployment
+  fullnameOverride: *DBDeploymentName
+  # postgresql.pgPass -- Password for the master PostgreSQL user.
+  # Feeds into the `postgrescredentials` secret that is provided to the PostgreSQL chart
+  pgPass: *MasterDBUserPass
+  auth:
+    # postgresql.existingSecret -- Name of existing secret that holds passwords for PostgreSQL
+    existingSecret: db-credentials

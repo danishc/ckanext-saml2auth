@@ -1,0 +1,126 @@
+# Endpoint where keycloak service will be deployed using ingress.
+CKANSite: &CKANsite ds.datascientia.local
+#CKANSite: &CKANsite ds.datascientia.disi.unitn.it
+# MasterDBPass -- Variable for password for the master user in PostgreSQL
+MasterDBUserPass: &MasterDBUserPass password
+# KeyCloakDBPass -- Variable for password for the keycloak user in PostgreSQL
+KeyCloakDBPass: &KeyCloakDBPass password
+# -- variable for keycloak admin password
+KeyCloakAdminPass: &KeyCloakAdminPass password
+
+# DBHost -- Variable for name of headless svc from postgres deployment
+DBHost: &DBHost postgres
+# MasterDBName -- Variable for name of the master user database in PostgreSQL
+MasterDBName: &MasterDBName postgres
+# MasterDBUser -- Variable for master user name for PostgreSQL
+MasterDBUser: &MasterDBUser postgres
+
+KeyCloakAdminUser: &KeyCloakAdminUser keycloak
+
+# KeyCloakDBName -- Variable for name of the database used by KeyCloak
+KeyCloakDBName: &KeyCloakDBName keycloak
+# KeyCloakDBUser -- Variable for username for the owner of the KeyCloak database
+KeyCloakDBUser: &KeyCloakDBUser keycloak
+
+keycloak:
+#  resources:
+#    limits:
+#      cpu: 1000m
+#      memory: 10Gi
+#    requests:
+#      cpu: 800m
+#      memory: 8Gi
+#  affinity: |
+#    nodeAffinity:
+#      requiredDuringSchedulingIgnoredDuringExecution:
+#        nodeSelectorTerms:
+#        - matchExpressions:
+#          - key: purpose
+#            operator: In
+#            values:
+#            - sweb
+  # new variables
+  env:
+    admin_user: *KeyCloakAdminUser
+    admin_pass: *KeyCloakAdminPass
+    db:
+      host: *DBHost
+      port: 5432
+      masterDB: *MasterDBName
+      masterUser: *MasterDBUser
+      masterPass: *MasterDBUserPass
+      user: *KeyCloakDBUser
+      name: *KeyCloakDBName
+      pass: *KeyCloakDBPass
+  # override existing variables
+  ingress:
+    enabled: true
+    ingressClassName: "nginx"
+    rules:
+      - host: *CKANsite
+        paths:
+          - path: /auth
+            pathType: Prefix
+  postgresql:
+    # Disable PostgreSQL dependency
+    enabled: false
+  # Extra variables
+  # init container to initialize db
+  extraInitContainers: |
+    - name: keycloak-init
+      image: "knowhub.disi.unitn.it:4443/datascientia_ckan_platform:2.9.5-v1.2.2"
+      imagePullPolicy: IfNotPresent
+      resources:
+        limits:
+          cpu: 50m
+          memory: 500Mi
+        requests:
+          cpu: 40m
+          memory: 300Mi
+      env:
+        - name: PSQL_MASTER_USER
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials
+              key: PSQL_MASTER_USER
+        - name: PSQL_MASTER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials
+              key: PSQL_MASTER_PASSWORD
+        - name: PSQL_MASTER_DB
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials
+              key: PSQL_MASTER_DB
+        - name: DB_SQLALCHEMY_URL
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-credentials
+              key: DB_SQLALCHEMY_URL
+      command: [ "python" ]
+      args: [ "/srv/db-init/db-init.py" ]
+      volumeMounts:
+        - name: db-init-configmap
+          mountPath: /srv/db-init
+  extraVolumes: |
+    - name: db-init-configmap
+      configMap:
+        name: db-init-configmap
+  extraEnvFrom: |
+    - secretRef:
+        name: 'keycloak-credentials'
+    - configMapRef:
+        name: 'keycloak-env-configmap'
+  # issue: https://github.com/codecentric/helm-charts/issues/329
+  extraEnv: |
+    - name: JGROUPS_DISCOVERY_PROTOCOL
+      value: dns.DNS_PING
+    - name: JGROUPS_DISCOVERY_PROPERTIES
+      value: 'dns_query={{ include "keycloak.serviceDnsName" . }}'
+    - name: CACHE_OWNERS_COUNT
+      value: "2"
+    - name: CACHE_OWNERS_AUTH_SESSIONS_COUNT
+      value: "2"
+    - name: PROXY_ADDRESS_FORWARDING
+      value: "true"

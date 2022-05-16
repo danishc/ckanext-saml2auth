@@ -1,0 +1,303 @@
+# Default values for ckan-chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+CKANSysAdminPass: &CKANSysAdminPass password
+# CkanDBUserPass -- Variable for password for the CKAN database user
+CkanDBUserPass: &CkanDBUserPass password
+# MasterDBUserPass -- Variable for password for the master user in PostgreSQL
+MasterDBUserPass: &MasterDBUserPass password
+
+ParentDomain: &ParentDomain datascientia.local
+CKANSite: &CKANsite ds.datascientia.local
+LiveLanguageSite: &LiveLanguageSite livelanguage.datascientia.local
+LivePeopleSite: &LivePeopleSite livepeople.datascientia.local
+CKANSiteFull: &CKANsiteFull "https://ds.datascientia.local/"
+DSCatalogSubdomains: &DSCatalogSubdomains "livelanguage livepeople"
+
+CKANImage: &CKANImage knowhub.disi.unitn.it:4443/datascientia_ckan_platform
+CKANTag: &CKANTag 2.9.5-v1.2.2
+
+nameOverride: ""
+fullnameOverride: "ckan"
+
+# RedisName -- Variable for name override for redis deployment
+RedisName: &RedisName redis
+
+
+# DBHost -- Variable for name of headless svc from postgres deployment
+DBHost: &DBHost postgres
+# MasterDBName -- Variable for name of the master user database in PostgreSQL
+MasterDBName: &MasterDBName postgres
+# MasterDBUser -- Variable for master user name for PostgreSQL
+MasterDBUser: &MasterDBUser postgres
+
+# CkanDBName -- Variable for name of the database used by CKAN
+CkanDBName: &CkanDBName ckan_default
+# CkanDBUser -- Variable for username for the owner of the CKAN database
+CkanDBUser: &CkanDBUser ckan_default
+
+ckan:
+  imagePullSecrets:
+    enabled: true
+    name: regcred
+  replicaCount: 1
+  image:
+    repository: *CKANImage
+    tag: *CKANTag
+    pullPolicy: IfNotPresent
+  env:
+    # ckan.site_logo -- Site logo for the instance
+    siteLogo: "/images/data-scientia-white-300-100.png"
+    parentDomain: *ParentDomain
+    dsCatalogSubdomains: *DSCatalogSubdomains
+    auth:
+      # default false
+      anon_create_dataset: false
+      # default false
+      create_unowned_dataset: false
+      # default false
+      create_dataset_if_not_in_organization: false
+      # default true
+      user_create_groups: false
+      # default false
+      user_create_organizations: false
+      # default false
+      user_delete_groups: false
+      # default false
+      user_delete_organizations: false
+      # default false
+      create_user_via_api: false
+      # default true
+      create_user_via_web: false
+      # default admin editor
+      roles_that_cascade_to_sub_groups: admin
+      # default false
+      public_user_details: true
+      # default true
+      public_activity_stream_detail: false
+      # default true
+      allow_dataset_collaborators: false
+      # default false
+      create_default_api_keys: false
+      # ckan.sysadminName -- CKAN system admin username
+    psql:
+      # ckan.psql.runOnAzure -- Set to true to run on Azure (if true wont run on anything other then azure) set to false to run on other platforms
+      runOnAzure: false
+      # ckan.psql.initialize -- Flag whether to initialize the PostgreSQL instance with the provided users and databases
+      initialize: true
+      # ckan.psql.masterUser -- PostgreSQL master username
+      masterUser: *MasterDBUser
+      # ckan.psql.masterPassword -- PostgreSQL master user password
+      masterPassword: *MasterDBUserPass
+      # ckan.psql.masterDatabase -- PostgreSQL database for the master user
+      masterDatabase: *MasterDBName
+    db:
+      # ckan.db.ckanDbUrl -- Url of the PostgreSQL server where the CKAN database is hosted
+      ckanDbUrl: *DBHost
+      # ckan.db.ckanDbName -- Name of the database to be used by CKAN
+      ckanDbName: *CkanDBName
+      # ckan.db.ckanDbUser -- Username of the database to be used by CKAN
+      ckanDbUser: *CkanDBUser
+      # ckan.db.ckanDbPassword -- Password of the user for the database to be used by CKAN
+      ckanDbPassword: *CkanDBUserPass
+    saml2auth:
+      # https://github.com/keitaroinc/ckanext-saml2auth
+      # Specifies the metadata location type
+      # Options: local or remote
+      idp_metadata:
+        location: "local"
+        local_path: "/srv/keycloak/idp/metadata.xml"
+
+      key_file_path: "/srv/keycloak/key/key.pem"
+      cert_file_path: "/srv/keycloak/cert/cert.pem"
+
+      # Corresponding SAML user field for firstname
+      user_firstname: "urn:oid:2.5.4.42"
+
+      # Corresponding SAML user field for lastname
+      user_lastname: "urn:oid:2.5.4.4"
+
+      # Corresponding SAML user field for fullname
+      # (Optional: Can be used as an alternative to firstname + lastname)
+      user_fullname: "givenName"
+
+      # Corresponding SAML user field for email
+      user_email: "urn:oid:1.2.840.113549.1.9.1"
+
+      # URL route of the endpoint where the SAML assertion is sent, also known as Assertion Consumer Service (ACS).
+      # Default: /acs
+      acs_endpoint: "/acs"
+
+      # Entity ID (also know as Issuer)
+      # Define the entity ID. Default is urn:mace:umu.se:saml:ckan:sp
+      entity_id: "myclient"
+
+      # Signed responses and assertions
+      want_response_signed: True
+      want_assertions_signed: True
+      want_assertions_or_response_signed: True
+
+      # List of email addresses from users that should be created as sysadmins (system administrators)
+      # Note that this means that CKAN sysadmins will _only_ be managed based on this config option and will override existing user permissions in the CKAN database
+      # If not set then it is ignored and CKAN sysadmins are managed through normal means
+      # Default: <Not set>
+      sysadmins_list: "danish.cheema@unitn.it"
+
+      # Indicates if this entity will sign the Logout Requests originated from it
+      logout_requests_signed: False
+
+      default_fallback_endpoint: "home.index"
+
+    sysadminName: "admin"
+    # ckan.sysadminPassword -- CKAN system admin password
+    sysadminPassword: *CKANSysAdminPass
+    # ckan.env.sysadminApiToken -- CKAN system admin API token
+    # Needs to be generated via the CKAN UI and replaced after initial deployment
+    sysadminApiToken: "replace_this_with_generated_api_token_for_sysadmin"
+    # ckan.sysadminEmail -- CKAN system admin email
+    sysadminEmail: "danish.cheema@unitn.it"
+    # ckan.siteTitle -- Site title for the instance
+    siteTitle: "DataScientia"
+    # ckan.siteId -- Site id
+    siteId: "site-id-here"
+    # ckan.preview.loadable -- Site id
+    previewLoadable:
+    # ckan.siteUrl -- Url for the CKAN instance
+    siteUrl: *CKANsiteFull
+    # ckan.ckanPlugins -- List of plugins to be used by the instance
+    # plugins are not configurable at run time.
+    ckanPlugins: "stats envvars saml2auth scheming_datasets scheming_groups scheming_organizations spatial_metadata datascientia"
+    defaultViews:
+    activityStreamsEmailNotifications: "false"
+    debug: "false"
+    # ckan.solr -- Location of SOLR collection used by the instance
+    solr: "http://solr:8983/solr/ckan"
+    # ckan.redis -- Location of the Redis service to be used by the CKAN instance
+    redis: "redis://redis-headless:6379/0"
+    locale:
+      offered: "en"
+      default: "en"
+    issues:
+      sendEmailNotifications: "false"
+
+    # ckan.extraEnv -- An array to add extra environment variables
+    # For example:
+    # extraEnv:
+    #   - name: FOO
+    #     value: "bar"
+    #
+    extraEnv: [ ]
+  affinity: {}
+#  affinity:
+#    nodeAffinity:
+#      requiredDuringSchedulingIgnoredDuringExecution:
+#        nodeSelectorTerms:
+#        - matchExpressions:
+#          - key: purpose
+#            operator: In
+#            values:
+#            - sweb
+  readiness:
+    # ckan.readiness.initialDelaySeconds -- Initial delay seconds for the readiness probe
+    initialDelaySeconds: 10
+    #  ckan.readiness.periodSeconds -- Check interval for the readiness probe
+    periodSeconds: 10
+    # ckan.readiness.failureThreshold -- Failure threshold for the readiness probe
+    failureThreshold: 6
+    # ckan.readiness.timeoutSeconds -- Timeout interval for the readiness probe
+    timeoutSeconds: 10
+  liveness:
+    # ckan.liveness.initialDelaySeconds -- Initial delay for the liveness probe
+    initialDelaySeconds: 10
+    # ckan.liveness.periodSeconds -- Check interval for the liveness probe
+    periodSeconds: 10
+    # ckan.liveness.failureThreshold -- Failure threshold for the liveness probe
+    failureThreshold: 6
+    # ckan.liveness.timeoutSeconds -- Timeout interval for the liveness probe
+    timeoutSeconds: 10
+  serviceAccount:
+    # serviceAccount.create -- Specifies whether a service account should be created
+    create: false
+    # serviceAccount.annotations -- Annotations to add to the service account
+    annotations: {}
+    # serviceAccount.name -- The name of the service account to use.
+    # If not set and create is true, a name is generated using the fullname template
+    name:
+  podSecurityContext: {}
+  securityContext: {}
+  service:
+    type: ClusterIP
+    port: 5000
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      # https://ilayk.com/2021/04/01/ingress-nginx-cors-multiple-origin
+      nginx.ingress.kubernetes.io/enable-cors: "true"
+      nginx.ingress.kubernetes.io/server-snippet: |
+        location ~ /catalog/livelanguage {
+           rewrite /catalog/livelanguage(/|$)(.*) https://livelanguage.datascientia.local/$2 permanent;
+        }
+        location ~ /catalog/livepeople {
+           rewrite /catalog/livepeople(/|$)(.*) https://livepeople.datascientia.local/$2 permanent;
+        }
+    hosts:
+      - host: *CKANsite
+        paths:
+          - path: /
+            pathType: Prefix
+      - host: *LiveLanguageSite
+        paths:
+          - path: /
+            pathType: Prefix
+      - host: *LivePeopleSite
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  #resources: {}
+#  resources:
+#    limits:
+#      cpu: 1000m
+#      memory: 700Mi
+#    requests:
+#      cpu: 800m
+#      memory: 500Mi
+
+  nodeSelector: {}
+  tolerations: []
+
+initContainer:
+  image:
+    name: busybox
+#  resources:
+#    limits:
+#      cpu: 50m
+#      memory: 500Mi
+#    requests:
+#      cpu: 40m
+#      memory: 300Mi
+
+redis:
+  # Please see all available overrides at https://github.com/helm/charts/tree/master/stable/redis
+  # redis.enabled -- Flag to control whether to deploy Redis
+  enabled: true
+  # redis.fullnameOverride -- Name override for the redis deployment
+  fullnameOverride: *RedisName
+  cluster:
+    # redis.cluster.enabled -- Cluster mode for Redis
+    enabled: false
+  master:
+    persistence:
+      # redis.master.persistence.enabled -- Enable redis volume claim
+      enabled: false
+#  resources:
+#    limits:
+#      cpu: 1000m
+#      memory: 10Gi
+#    requests:
+#      cpu: 800m
+#      memory: 8Gi
+  # redis.usePassword -- Use password for accessing redis
+  usePassword: false

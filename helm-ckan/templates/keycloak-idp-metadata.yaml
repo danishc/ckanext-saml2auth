@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-idp-metadata
+data:
+  metadata.xml: |
+{{ .Files.Get "keycloak-client/local/saml2-idp-metadata.xml" | indent 4 }}

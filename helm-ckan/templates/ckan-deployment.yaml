@@ -1,0 +1,241 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ckan-chart.fullname" . }}
+  labels:
+    {{- include "ckan-chart.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.ckan.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ckan-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ckan-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.ckan.imagePullSecrets.enabled }}
+      imagePullSecrets:
+        - name: {{ .Values.ckan.imagePullSecrets.name }}
+      {{- end }}
+      serviceAccountName: {{ include "ckan-chart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.ckan.podSecurityContext | nindent 8 }}
+      volumes:
+        - name: db-init-configmap
+          configMap:
+            name: db-init-configmap
+        - name: keycloak-idp-metadata
+          configMap:
+            name: keycloak-idp-metadata
+        - name: keycloak-client-cert
+          secret:
+            secretName: keycloak-client-cert
+        - name: keycloak-client-key
+          secret:
+            secretName: keycloak-client-key
+      initContainers:
+        - name: psql-init
+          image: "{{ .Values.ckan.image.repository }}:{{ .Values.ckan.image.tag }}"
+          imagePullPolicy: {{ .Values.ckan.image.pullPolicy }}
+          env:
+            - name: PSQL_MASTER_USER
+              value: {{ .Values.ckan.env.psql.masterUser }}
+            - name: PSQL_MASTER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ckancredentials
+                  key: psqlMasterPassword
+            - name: PSQL_MASTER_DB
+              value: {{ .Values.ckan.env.psql.masterDatabase }}
+            - name: CKAN_DB
+              value: {{ .Values.ckan.env.db.ckanDbName }}
+            - name: DB_SQLALCHEMY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ckancredentials
+                  key: ckanSqlAlchemyUrl
+          command: [ "python" ]
+          args: [ "/srv/db-init/db-init.py" ]
+          volumeMounts:
+            - name: db-init-configmap
+              mountPath: /srv/db-init
+          resources:
+            {{- toYaml .Values.initContainer.resources | nindent 12 }}
+        - name: ckan-test-solr-connection
+          image: "{{ .Values.initContainer.image.name }}"
+          resources:
+            {{- toYaml .Values.initContainer.resources | nindent 12 }}
+          command: [ 'sh', '-c', 'until nc -vz solr 8983; do echo "Waiting for solr to start"; sleep 3; done;' ]
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.ckan.securityContext | nindent 12 }}
+          image: "{{ .Values.ckan.image.repository }}:{{ .Values.ckan.image.tag }}"
+          imagePullPolicy: {{ .Values.ckan.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.ckan.service.port }}
+              protocol: TCP
+          env:
+            - name: DEBUG
+              value: {{ .Values.ckan.env.debug | quote }}
+            - name: MAINTENANCE_MODE
+              value: {{ .Values.ckan.env.maintenanceMode | quote }}
+            - name: CKAN___DEBUG
+              value: {{ .Values.ckan.env.debug | quote }}
+            - name: CKAN_SYSADMIN_NAME
+              value: {{ .Values.ckan.env.sysadminName }}
+            - name: CKAN_SYSADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ckancredentials
+                  key: sysadminPassword
+            - name: CKAN_SYSADMIN_EMAIL
+              value: {{ .Values.ckan.env.sysadminEmail }}
+            - name: CKAN__SITE_TITLE
+              value: {{ .Values.ckan.env.siteTitle }}
+            - name: CKAN_SITE_ID
+              value: {{ .Values.ckan.env.siteId }}
+            - name: CKAN_SITE_URL
+              value: {{ .Values.ckan.env.siteUrl }}
+            - name: CKAN__SITE_LOGO
+              value: {{ .Values.ckan.env.siteLogo }}
+            - name: CKAN__PREVIEW__LOADABLE
+              value: {{ .Values.ckan.env.previewLoadable }}
+            - name: CKAN__PLUGINS
+              value: {{ .Values.ckan.env.ckanPlugins }}
+            - name: CKANEXT__DS__CATALOG_SUBDOMAINS
+              value: {{ .Values.ckan.env.dsCatalogSubdomains }}
+            - name: CKANEXT__DS__PARENT_DOMAIN
+              value: {{ .Values.ckan.env.parentDomain }}
+            - name: CKAN__VIEWS__DEFAULT_VIEWS
+              value: {{ .Values.ckan.env.defaultViews }}
+            - name: CKAN__STORAGE_PATH
+              value:
+            - name: PSQL_MASTER
+              value: {{ .Values.ckan.env.psql.masterUser }}
+            - name: PSQL_PASSWD
+              valueFrom:
+                secretKeyRef:
+                  name: ckancredentials
+                  key: psqlMasterPassword
+            - name: PSQL_DB
+              value: {{ .Values.ckan.env.psql.masterDatabase }}
+            - name: CKAN_SQLALCHEMY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ckancredentials
+                  key: ckanSqlAlchemyUrl
+            - name: CKAN_SOLR_URL
+              value: {{ .Values.ckan.env.solr }}
+            - name: CKAN__REDIS__URL
+              value: {{ .Values.ckan.env.redis }}
+            - name: CKAN__LOCALES_OFFERED
+              value: {{ .Values.ckan.env.locale.offered | quote }}
+            - name: CKAN__LOCALE_DEFAULT
+              value: {{ .Values.ckan.env.locale.default }}
+            - name: CKAN__ACTIVITY_STREAMS_EMAIL_NOTIFICATIONS
+              value: {{ .Values.ckan.env.activityStreamsEmailNotifications | quote }}
+            - name: CKANEXT__ISSUES__SEND_EMAIL_NOTIFICATIONS
+              value: {{ .Values.ckan.env.issues.sendEmailNotifications | quote }}
+            - name: CKAN__AUTH__ANON_CREATE_DATASET
+              value: {{ .Values.ckan.env.auth.anon_create_dataset | quote }}
+            - name: CKAN__AUTH__CREATE_UNOWNED_DATASET
+              value: {{ .Values.ckan.env.auth.create_unowned_dataset | quote }}
+            - name: CKAN__AUTH__CREATE_DATASET_IF_NOT_IN_ORGANIZATION
+              value: {{ .Values.ckan.env.auth.create_dataset_if_not_in_organization | quote }}
+            - name: CKAN__AUTH__USER_CREATE_GROUPS
+              value: {{ .Values.ckan.env.auth.user_create_groups | quote }}
+            - name: CKAN__AUTH__USER_CREATE_ORGANIZATIONS
+              value: {{ .Values.ckan.env.auth.user_create_organizations | quote }}
+            - name: CKAN__AUTH__USER_DELETE_GROUPS
+              value: {{ .Values.ckan.env.auth.user_delete_groups | quote }}
+            - name: CKAN__AUTH__USER_DELETE_ORGANIZATIONS
+              value: {{ .Values.ckan.env.auth.user_delete_organizations | quote }}
+            - name: CKAN__AUTH__CREATE_USER_VIA_API
+              value: {{ .Values.ckan.env.auth.create_user_via_api | quote }}
+            - name: CKAN__AUTH__CREATE_USER_VIA_WEB
+              value: {{ .Values.ckan.env.auth.create_user_via_web | quote }}
+            - name: CKAN__AUTH__ROLES_THAT_CASCADE_TO_SUB_GROUPS
+              value: {{ .Values.ckan.env.auth.roles_that_cascade_to_sub_groups | quote }}
+            - name: CKAN__AUTH__PUBLIC_USER_DETAILS
+              value: {{ .Values.ckan.env.auth.public_user_details | quote }}
+            - name: CKAN__AUTH__PUBLIC_ACTIVITY_STREAM_DETAILS
+              value: {{ .Values.ckan.env.auth.public_activity_stream_detail | quote }}
+            - name: CKAN__AUTH__ALLOW_DATASET_COLLABORATORS
+              value: {{ .Values.ckan.env.auth.allow_dataset_collaborators | quote }}
+            - name: CKAN__AUTH__CREATE_DEFAULT_API_KEYS
+              value: {{ .Values.ckan.env.auth.create_default_api_keys | quote }}
+            - name: CKANEXT__SAML2AUTH__IDP_METADATA__LOCATION
+              value: {{ .Values.ckan.env.saml2auth.idp_metadata.location }}
+            - name: CKANEXT__SAML2AUTH__IDP_METADATA__LOCAL_PATH
+              value: {{ .Values.ckan.env.saml2auth.idp_metadata.local_path }}
+            - name: CKANEXT__SAML2AUTH__KEY_FILE_PATH
+              value: {{ .Values.ckan.env.saml2auth.key_file_path }}
+            - name: CKANEXT__SAML2AUTH__CERT_FILE_PATH
+              value: {{ .Values.ckan.env.saml2auth.cert_file_path }}
+            - name: CKANEXT__SAML2AUTH__USER_FIRSTNAME
+              value: {{ .Values.ckan.env.saml2auth.user_firstname }}
+            - name: CKANEXT__SAML2AUTH__USER_LASTNAME
+              value: {{ .Values.ckan.env.saml2auth.user_lastname }}
+            - name: CKANEXT__SAML2AUTH__USER_FULLNAME
+              value: {{ .Values.ckan.env.saml2auth.user_fullname }}
+            - name: CKANEXT__SAML2AUTH__USER_EMAIL
+              value: {{ .Values.ckan.env.saml2auth.user_email }}
+            - name: CKANEXT__SAML2AUTH__ACS_ENDPOINT
+              value: {{ .Values.ckan.env.saml2auth.acs_endpoint }}
+            - name: CKANEXT__SAML2AUTH__ENTITY_ID
+              value: {{ .Values.ckan.env.saml2auth.entity_id }}
+            - name: CKANEXT__SAML2AUTH__WANT_RESPONSE_SIGNED
+              value: {{ .Values.ckan.env.saml2auth.want_response_signed | quote }}
+            - name: CKANEXT__SAML2AUTH__WANT_ASSERTIONS_SIGNED
+              value: {{ .Values.ckan.env.saml2auth.want_assertions_signed | quote }}
+            - name: CKANEXT__SAML2AUTH__WANT_ASSERTIONS_OR_RESPONSE_SIGNED
+              value: {{ .Values.ckan.env.saml2auth.want_assertions_or_response_signed | quote }}
+            - name: CKANEXT__SAML2AUTH__SYSADMINS_LIST
+              value: {{ .Values.ckan.env.saml2auth.sysadmins_list }}
+            - name: CKANEXT__SAML2AUTH__LOGOUT_REQUESTS_SIGNED
+              value: {{ .Values.ckan.env.saml2auth.logout_requests_signed | quote }}
+            - name: CKANEXT__SAML2AUTH__DEFAULT_FALLBACK_ENDPOINT
+              value: {{ .Values.ckan.env.saml2auth.default_fallback_endpoint }}
+            {{- if .Values.ckan.env.extraEnv }}
+            {{ toYaml .Values.ckan.env.extraEnv | indent 12 }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /api/3/action/status_show
+              port: http
+            initialDelaySeconds: {{ .Values.ckan.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ckan.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.ckan.readiness.failureThreshold }}
+            timeoutSeconds: {{ .Values.ckan.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /api/3/action/status_show
+              port: http
+            initialDelaySeconds: {{ .Values.ckan.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ckan.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.ckan.liveness.failureThreshold }}
+            timeoutSeconds: {{ .Values.ckan.liveness.timeoutSeconds }}
+          resources:
+            {{- toYaml .Values.ckan.resources | nindent 12 }}
+          volumeMounts:
+            - name: keycloak-idp-metadata
+              mountPath: /srv/keycloak/idp/
+            - name: keycloak-client-cert
+              mountPath: /srv/keycloak/cert/
+            - name: keycloak-client-key
+              mountPath: /srv/keycloak/key/
+      {{- with .Values.ckan.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ckan.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ckan.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

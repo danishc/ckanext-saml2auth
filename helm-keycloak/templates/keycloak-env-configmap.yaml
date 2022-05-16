@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-env-configmap
+data:
+  DB_VENDOR: {{ .Values.keycloak.env.db.host }}
+  DB_ADDR: {{ .Values.keycloak.env.db.host }}
+  DB_PORT: {{ .Values.keycloak.env.db.port | quote }}
+  DB_DATABASE: {{ .Values.keycloak.env.db.name }}
+  KEYCLOAK_USER: {{ .Values.keycloak.env.admin_user }}
+  KEYCLOAK_PASSWORD: {{ .Values.keycloak.env.admin_pass }}

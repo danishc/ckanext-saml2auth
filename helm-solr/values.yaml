@@ -1,0 +1,32 @@
+# Default values for helm-solr.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+solr:
+  replicaCount: 1
+  pvc:
+    enabled: false
+  service:
+    port: 8983
+#  resources:
+#    limits:
+#      cpu: 1000m
+#      memory: 10Gi
+#    requests:
+#      cpu: 800m
+#      memory: 8Gi
+  image:
+    repository: ckan/ckan-solr
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "2.10"
+  affinity: {}
+#  affinity:
+#    nodeAffinity:
+#      requiredDuringSchedulingIgnoredDuringExecution:
+#        nodeSelectorTerms:
+#        - matchExpressions:
+#          - key: purpose
+#            operator: In
+#            values:
+#            - sweb

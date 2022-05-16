@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init-configmap
+data:
+  db-init.py: |
+{{ .Files.Get "db-init/db-init.py" | indent 4 }}
