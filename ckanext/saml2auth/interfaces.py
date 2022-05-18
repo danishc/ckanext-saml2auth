@@ -57,3 +57,6 @@ class ISaml2Auth(Interface):
             as part of the SAML Response
         '''
         return resp
+
+    def after_logout(self, resp):
+        return resp

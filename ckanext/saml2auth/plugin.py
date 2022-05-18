@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import logging
 
+from ckanext.saml2auth.interfaces import ISaml2Auth
 from saml2.client_base import LogoutError
 from saml2 import entity
 
@@ -165,5 +166,8 @@ def _perform_slo():
             else:
                 log.error(
                     'Failed to log out from Idp. Unknown binding: {}'.format(binding))
+
+    for plugin in plugins.PluginImplementations(ISaml2Auth):
+        response = plugin.after_logout(response)
 
     return response
